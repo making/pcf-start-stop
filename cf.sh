@@ -4,6 +4,7 @@ alias bosh='BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bun
 STOP_SEQ="nats $STOP_SEQ"
 STOP_SEQ="consul_server $STOP_SEQ"
 STOP_SEQ="etcd_server $STOP_SEQ"
+STOP_SEQ="etcd_tls_server $STOP_SEQ"
 STOP_SEQ="diego_database $STOP_SEQ"
 STOP_SEQ="nfs_server $STOP_SEQ"
 STOP_SEQ="router $STOP_SEQ"
