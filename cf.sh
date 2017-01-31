@@ -31,14 +31,14 @@ case $1 in
 	echo "==== Start CF ===="
 	for i in $START_SEQ;do
 	    echo "start $i"
-	    bosh -n start --force $2 $i
+	    bosh -n start --force $i
 	done
 	;;
     stop)
 	echo "==== Stop CF ===="
 	for i in $STOP_SEQ;do
 	    echo "stop $i"
-	    bosh -n stop --force $2 $i
+	    bosh -n stop --force --hard $i
 	done
 	;;
 
