@@ -3,7 +3,6 @@ alias bosh='BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bun
 
 STOP_SEQ="mysql $STOP_SEQ"
 STOP_SEQ="mysql_proxy $STOP_SEQ"
-STOP_SEQ="mysql_monitor $STOP_SEQ"
 STOP_SEQ="consul_server $STOP_SEQ"
 STOP_SEQ="nats $STOP_SEQ"
 STOP_SEQ="etcd_tls_server $STOP_SEQ"
@@ -18,6 +17,7 @@ STOP_SEQ="tcp_router $STOP_SEQ"
 STOP_SEQ="diego_database $STOP_SEQ"
 STOP_SEQ="diego_brain $STOP_SEQ"
 STOP_SEQ="diego_cell $STOP_SEQ"
+STOP_SEQ="mysql_monitor $STOP_SEQ"
 STOP_SEQ="doppler $STOP_SEQ"
 STOP_SEQ="loggregator_trafficcontroller $STOP_SEQ"
 
