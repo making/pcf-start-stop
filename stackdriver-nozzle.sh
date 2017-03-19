@@ -1,7 +1,5 @@
 #!/bin/sh
-if [ "`which bosh`" == "" ];then
-    alias bosh='BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh'
-fi
+alias bosh='BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh'
 
 STOP_SEQ="stackdriver-nozzle $STOP_SEQ"
 
