@@ -1,5 +1,7 @@
 #!/bin/sh
-alias bosh='BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh'
+if [ "`which bosh`" == "" ];then
+	alias bosh='BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh'
+fi
 
 STOP_SEQ="mysql $STOP_SEQ"
 STOP_SEQ="mysql_proxy $STOP_SEQ"
