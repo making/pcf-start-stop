@@ -7,10 +7,10 @@ type: docker-image
 source:
   repository: starkandwayne/concourse
 run:
-path: bash
-args:
-- -c
-- |
-  set -e
-  export BOSH_CMD="/tmp/${ID}/pcf-start-stop/${TARGET}.sh ${START_STOP}"
-  pcf-start-stop/ci/tasks/remote-bosh.sh
+  path: bash
+  args:
+  - -c
+  - |
+    set -e
+    export BOSH_CMD="/tmp/${ID}/pcf-start-stop/${TARGET}.sh ${START_STOP}"
+    pcf-start-stop/ci/tasks/remote-bosh.sh

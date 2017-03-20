@@ -7,10 +7,10 @@ type: docker-image
 source:
   repository: starkandwayne/concourse
 run:
-path: bash
-args:
-- -c
-- |
-  set -e
-  export BOSH_CMD="BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh -n -d \`ls /var/tempest/workspaces/default/deployments/cf*\` run errand smoke-tests"
-  pcf-start-stop/ci/tasks/remote-bosh.sh
+  path: bash
+  args:
+  - -c
+  - |
+    set -e
+    export BOSH_CMD="BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh -n -d \`ls /var/tempest/workspaces/default/deployments/cf*\` run errand smoke-tests"
+    pcf-start-stop/ci/tasks/remote-bosh.sh
