@@ -14,5 +14,6 @@ send \"${BOSH_USER}\n\"
 expect \"Password:\"
 send \"${BOSH_PASSWORD}\n\"
 interact
-"
+" > /dev/null
+
 bundle exec bosh status
