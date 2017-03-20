@@ -13,10 +13,10 @@ resources:
   #     start: 7:00 PM
   #     stop: 10:00 PM
 jobs:
-- name: stop-ert
+- name: start-ert
   plan:
   - get: pcf-start-stop
-  - task: stop-pcf
+  - task: start-ert
     params: &OPSMGR
       OPSMGR_HOST: {{opsmgr-host}}
       OPSMGR_SSH_USER: {{opsmgr-ssh-user}}
@@ -51,8 +51,82 @@ jobs:
           ssh ${SSH_OPTS} ${SSH_TARGET} "mkdir /tmp/${ID}"
           scp ${SSH_OPTS} -r pcf-start-stop ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
           scp ${SSH_OPTS} .bosh ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && $BOSH --ca-cert /var/tempest/workspaces/default/root_ca_certificate target ${BOSH_DIRECTOR_IP}"
+          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && bash /tmp/${ID}/pcf-start-stop/bosh-target.sh"
+          ssh ${SSH_OPTS} ${SSH_TARGET} "/tmp/${ID}/pcf-start-stop/pcf-1.10.sh start"
+          ssh ${SSH_OPTS} ${SSH_TARGET} "rm -rf /tmp/${ID}"
+- name: stop-ert
+  plan:
+  - get: pcf-start-stop
+  - task: stop-ert
+    params: 
+      <<: *OPSMGR
+    config:
+      platform: linux
+      inputs:
+      - name: pcf-start-stop
+      image_resource:
+        type: docker-image
+        source:
+          repository: starkandwayne/concourse
+      run:
+        path: sh
+        args:
+        - -c
+        - |
+          cat > ~/opsmgr_ssh <<EOF
+          ${OPSMGR_SSH_KEY}
+          EOF
+          chmod 400 ~/opsmgr_ssh
+          SSH_OPTS="-oStrictHostKeyChecking=no -i ~/opsmgr_ssh"
+          SSH_TARGET=${OPSMGR_SSH_USER}@${OPSMGR_HOST}
+          ID=`date +%s`
+          rm -rf pcf-start-stop/.git
+          echo "export BOSH_USER=${BOSH_USER}" >> .bosh
+          echo "export BOSH_PASSWORD=${BOSH_PASSWORD}" >> .bosh
+          BOSH="BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh"
+          ssh ${SSH_OPTS} ${SSH_TARGET} "mkdir /tmp/${ID}"
+          scp ${SSH_OPTS} -r pcf-start-stop ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
+          scp ${SSH_OPTS} .bosh ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
+          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && bash /tmp/${ID}/pcf-start-stop/bosh-target.sh"
           ssh ${SSH_OPTS} ${SSH_TARGET} "/tmp/${ID}/pcf-start-stop/pcf-1.10.sh stop"
+          ssh ${SSH_OPTS} ${SSH_TARGET} "rm -rf /tmp/${ID}"
+- name: smoke-test-ert
+  plan:
+  - get: pcf-start-stop
+  - task: start-ert
+    params:
+      <<: *OPSMGR
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: starkandwayne/concourse
+      inputs:
+      - name: pcf-start-stop
+      run:
+        path: sh
+        args:
+        - -c
+        - |
+          set -e
+          cat > ~/opsmgr_ssh <<EOF
+          ${OPSMGR_SSH_KEY}
+          EOF
+          chmod 400 ~/opsmgr_ssh
+          SSH_OPTS="-oStrictHostKeyChecking=no -i ~/opsmgr_ssh"
+          SSH_TARGET=${OPSMGR_SSH_USER}@${OPSMGR_HOST}
+          ID=`date +%s`
+          rm -rf pcf-start-stop/.git
+          echo "export BOSH_USER=${BOSH_USER}" >> .bosh
+          echo "export BOSH_PASSWORD=${BOSH_PASSWORD}" >> .bosh
+          echo "export BOSH_DIRECTOR_IP=${BOSH_DIRECTOR_IP}" >> .bosh
+          BOSH="BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh"
+          ssh ${SSH_OPTS} ${SSH_TARGET} "mkdir /tmp/${ID}"
+          scp ${SSH_OPTS} -r pcf-start-stop ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
+          scp ${SSH_OPTS} .bosh ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
+          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && bash /tmp/${ID}/pcf-start-stop/bosh-target.sh"
+          ssh ${SSH_OPTS} ${SSH_TARGET} "$BOSH -n run errand smoke-tests"
           ssh ${SSH_OPTS} ${SSH_TARGET} "rm -rf /tmp/${ID}"
 - name: stop-stackdriver-nozzle
   plan:
@@ -87,7 +161,7 @@ jobs:
           ssh ${SSH_OPTS} ${SSH_TARGET} "mkdir /tmp/${ID}"
           scp ${SSH_OPTS} -r pcf-start-stop ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
           scp ${SSH_OPTS} .bosh ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && $BOSH --ca-cert /var/tempest/workspaces/default/root_ca_certificate target ${BOSH_DIRECTOR_IP}"
+          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && bash /tmp/${ID}/pcf-start-stop/bosh-target.sh"
           ssh ${SSH_OPTS} ${SSH_TARGET} "/tmp/${ID}/pcf-start-stop/stackdriver-nozzle.sh stop"
           ssh ${SSH_OPTS} ${SSH_TARGET} "rm -rf /tmp/${ID}"
 
