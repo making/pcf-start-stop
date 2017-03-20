@@ -47,10 +47,11 @@ jobs:
     file: pcf-start-stop/ci/tasks/smoke-test-ert.yml
 - name: stop-jmx-bridge
   plan:
-  - get: pcf-start-stop
+  - get: every4am
     passed:
     - stop-ert
     trigger: true
+  - get: pcf-start-stop
   - task: stop-jmx-bridge
     params:
       <<: *OPSMGR
@@ -59,10 +60,11 @@ jobs:
     file: pcf-start-stop/ci/tasks/pcf-start-stop.yml
 - name: stop-stackdriver-nozzle
   plan:
-  - get: pcf-start-stop
+  - get: every4am
     passed:
     - stop-jmx-bridge
     trigger: true
+  - get: pcf-start-stop
   - task: stop-stackdriver-nozzle
     params:
       <<: *OPSMGR
