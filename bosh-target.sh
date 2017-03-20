@@ -16,4 +16,4 @@ send \"${BOSH_PASSWORD}\n\"
 exit 0
 "
 
-bundle exec bosh target
+bundle exec bosh status
