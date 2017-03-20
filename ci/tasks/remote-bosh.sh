@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 cat > ~/opsmgr_ssh <<EOF
 ${OPSMGR_SSH_KEY}
