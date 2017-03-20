@@ -6,7 +6,10 @@ EOF
 chmod 400 ~/opsmgr_ssh
 SSH_OPTS="-oStrictHostKeyChecking=no -i ~/opsmgr_ssh"
 SSH_TARGET=${OPSMGR_SSH_USER}@${OPSMGR_HOST}
-ID=`date +%s`
+if [ "x${ID}" == "x" ];then
+	ID=`date +%s`
+fi
+
 rm -rf pcf-start-stop/.git
 echo "export BOSH_USER=${BOSH_USER}" >> .bosh
 echo "export BOSH_PASSWORD=${BOSH_PASSWORD}" >> .bosh

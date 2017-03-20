@@ -12,5 +12,6 @@ run:
   - -c
   - |
     set -e
+    export ID=`date +%s`
     export BOSH_CMD="/tmp/${ID}/pcf-start-stop/${TARGET}.sh ${START_STOP}"
     pcf-start-stop/ci/tasks/remote-bosh.sh
