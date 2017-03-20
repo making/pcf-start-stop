@@ -5,13 +5,13 @@ resources:
   source:
     uri: https://github.com/making/pcf-start-stop
     branch: master
-  # - name: every7pm
-  #   type: time
-  #   source:
-  #     interval: 24h
-  #     location: Asia/Tokyo
-  #     start: 7:00 PM
-  #     stop: 10:00 PM
+- name: every4am
+  type: time
+  source:
+    interval: 24h
+    location: Asia/Tokyo
+    start: 4:00 AM
+    stop: 7:00 AM
 jobs:
 - name: start-ert
   plan:
@@ -24,145 +24,50 @@ jobs:
       BOSH_DIRECTOR_IP: {{bosh-director-ip}}
       BOSH_USER: {{bosh-user}}
       BOSH_PASSWORD: {{bosh-password}}
-    config:
-      platform: linux
-      inputs:
-      - name: pcf-start-stop
-      image_resource:
-        type: docker-image
-        source:
-          repository: starkandwayne/concourse
-      run:
-        path: sh
-        args:
-        - -c
-        - |
-          cat > ~/opsmgr_ssh <<EOF
-          ${OPSMGR_SSH_KEY}
-          EOF
-          chmod 400 ~/opsmgr_ssh
-          SSH_OPTS="-oStrictHostKeyChecking=no -i ~/opsmgr_ssh"
-          SSH_TARGET=${OPSMGR_SSH_USER}@${OPSMGR_HOST}
-          ID=`date +%s`
-          rm -rf pcf-start-stop/.git
-          echo "export BOSH_USER=${BOSH_USER}" >> .bosh
-          echo "export BOSH_PASSWORD=${BOSH_PASSWORD}" >> .bosh
-          BOSH="BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "mkdir /tmp/${ID}"
-          scp ${SSH_OPTS} -r pcf-start-stop ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          scp ${SSH_OPTS} .bosh ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && bash /tmp/${ID}/pcf-start-stop/bosh-target.sh"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "/tmp/${ID}/pcf-start-stop/pcf-1.10.sh start"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "rm -rf /tmp/${ID}"
+      START_STOP: start
+      TARGET: pcf-1.10
+    file: pcf-start-stop/ci/tasks/pcf-start-stop.yml
 - name: stop-ert
   plan:
+  - get: every4am
+    trigger: true
   - get: pcf-start-stop
   - task: stop-ert
-    params: 
+    params:
       <<: *OPSMGR
-    config:
-      platform: linux
-      inputs:
-      - name: pcf-start-stop
-      image_resource:
-        type: docker-image
-        source:
-          repository: starkandwayne/concourse
-      run:
-        path: sh
-        args:
-        - -c
-        - |
-          cat > ~/opsmgr_ssh <<EOF
-          ${OPSMGR_SSH_KEY}
-          EOF
-          chmod 400 ~/opsmgr_ssh
-          SSH_OPTS="-oStrictHostKeyChecking=no -i ~/opsmgr_ssh"
-          SSH_TARGET=${OPSMGR_SSH_USER}@${OPSMGR_HOST}
-          ID=`date +%s`
-          rm -rf pcf-start-stop/.git
-          echo "export BOSH_USER=${BOSH_USER}" >> .bosh
-          echo "export BOSH_PASSWORD=${BOSH_PASSWORD}" >> .bosh
-          BOSH="BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "mkdir /tmp/${ID}"
-          scp ${SSH_OPTS} -r pcf-start-stop ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          scp ${SSH_OPTS} .bosh ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && bash /tmp/${ID}/pcf-start-stop/bosh-target.sh"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "/tmp/${ID}/pcf-start-stop/pcf-1.10.sh stop"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "rm -rf /tmp/${ID}"
+      START_STOP: stop
+      TARGET: pcf-1.10
+    file: pcf-start-stop/ci/tasks/pcf-start-stop.yml
 - name: smoke-test-ert
   plan:
   - get: pcf-start-stop
   - task: start-ert
     params:
       <<: *OPSMGR
-    config:
-      platform: linux
-      image_resource:
-        type: docker-image
-        source:
-          repository: starkandwayne/concourse
-      inputs:
-      - name: pcf-start-stop
-      run:
-        path: sh
-        args:
-        - -c
-        - |
-          set -e
-          cat > ~/opsmgr_ssh <<EOF
-          ${OPSMGR_SSH_KEY}
-          EOF
-          chmod 400 ~/opsmgr_ssh
-          SSH_OPTS="-oStrictHostKeyChecking=no -i ~/opsmgr_ssh"
-          SSH_TARGET=${OPSMGR_SSH_USER}@${OPSMGR_HOST}
-          ID=`date +%s`
-          rm -rf pcf-start-stop/.git
-          echo "export BOSH_USER=${BOSH_USER}" >> .bosh
-          echo "export BOSH_PASSWORD=${BOSH_PASSWORD}" >> .bosh
-          echo "export BOSH_DIRECTOR_IP=${BOSH_DIRECTOR_IP}" >> .bosh
-          BOSH="BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "mkdir /tmp/${ID}"
-          scp ${SSH_OPTS} -r pcf-start-stop ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          scp ${SSH_OPTS} .bosh ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && bash /tmp/${ID}/pcf-start-stop/bosh-target.sh"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "$BOSH -n run errand smoke-tests"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "rm -rf /tmp/${ID}"
+    file: pcf-start-stop/ci/tasks/smoke-test-ert.yml
+- name: stop-jmx-bridge
+  plan:
+  - get: pcf-start-stop
+    passed:
+    - stop-ert
+    trigger: true
+  - task: stop-jmx-bridge
+    params:
+      <<: *OPSMGR
+      START_STOP: stop
+      TARGET: jmx-bridge
+    file: pcf-start-stop/ci/tasks/pcf-start-stop.yml
 - name: stop-stackdriver-nozzle
   plan:
   - get: pcf-start-stop
+    passed:
+    - stop-jmx-bridge
+    trigger: true
   - task: stop-stackdriver-nozzle
     params:
       <<: *OPSMGR
-    config:
-      platform: linux
-      inputs:
-      - name: pcf-start-stop
-      image_resource:
-        type: docker-image
-        source:
-          repository: starkandwayne/concourse
-      run:
-        path: sh
-        args:
-        - -c
-        - |
-          cat > ~/opsmgr_ssh <<EOF
-          ${OPSMGR_SSH_KEY}
-          EOF
-          chmod 400 ~/opsmgr_ssh
-          SSH_OPTS="-oStrictHostKeyChecking=no -i ~/opsmgr_ssh"
-          SSH_TARGET=${OPSMGR_SSH_USER}@${OPSMGR_HOST}
-          ID=`date +%s`
-          rm -rf pcf-start-stop/.git
-          echo "export BOSH_USER=${BOSH_USER}" >> .bosh
-          echo "export BOSH_PASSWORD=${BOSH_PASSWORD}" >> .bosh
-          BOSH="BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile bundle exec bosh"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "mkdir /tmp/${ID}"
-          scp ${SSH_OPTS} -r pcf-start-stop ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          scp ${SSH_OPTS} .bosh ${SSH_TARGET}:/tmp/${ID}/ > /dev/null
-          ssh ${SSH_OPTS} ${SSH_TARGET} "source /tmp/${ID}/.bosh && bash /tmp/${ID}/pcf-start-stop/bosh-target.sh"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "/tmp/${ID}/pcf-start-stop/stackdriver-nozzle.sh stop"
-          ssh ${SSH_OPTS} ${SSH_TARGET} "rm -rf /tmp/${ID}"
+      START_STOP: stop
+      TARGET: stackdriver-nozzle
+    file: pcf-start-stop/ci/tasks/pcf-start-stop.yml
 
 
