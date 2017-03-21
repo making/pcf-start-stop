@@ -16,4 +16,14 @@ send \"${BOSH_PASSWORD}\n\"
 interact
 " > /dev/null
 
+expect -c "
+set timeout 5
+spawn bundle exec bosh login
+expect \"Email:\"
+send \"${BOSH_USER}\n\"
+expect \"Password:\"
+send \"${BOSH_PASSWORD}\n\"
+interact
+" > /dev/null
+
 bundle exec bosh status
