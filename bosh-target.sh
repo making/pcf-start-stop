@@ -2,6 +2,7 @@
 set -e
 
 if [ "x`which expect`" == "x" ];then
+	sudo apt-get update -y
 	sudo apt-get install -y expect
 fi
 
