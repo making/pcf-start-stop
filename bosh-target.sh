@@ -8,7 +8,7 @@ fi
 
 export BUNDLE_GEMFILE=/home/tempest-web/tempest/web/vendor/bosh/Gemfile
 expect -c "
-set timeout 5
+set timeout 10
 spawn bundle exec bosh --ca-cert /var/tempest/workspaces/default/root_ca_certificate target ${BOSH_DIRECTOR_IP}
 expect \"Email:\"
 send \"${BOSH_USER}\n\"
@@ -18,7 +18,7 @@ interact
 " > /dev/null
 
 expect -c "
-set timeout 5
+set timeout 10
 spawn bundle exec bosh login
 expect \"Email:\"
 send \"${BOSH_USER}\n\"
