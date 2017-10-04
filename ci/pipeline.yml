@@ -5,71 +5,101 @@ resources:
   source:
     uri: https://github.com/making/pcf-start-stop
     branch: master
-- name: every4am
-  type: time
-  source:
-    interval: 24h
-    location: Asia/Tokyo
-    start: 4:00 AM
-    stop: 7:00 AM
-jobs:
-- name: start-ert
-  plan:
-  - get: pcf-start-stop
-  - task: start-ert
-    params: &OPSMGR
-      OPSMGR_HOST: {{opsmgr-host}}
-      OPSMGR_SSH_USER: {{opsmgr-ssh-user}}
-      OPSMGR_SSH_KEY: {{opsmgr-ssh-key}}
-      BOSH_DIRECTOR_IP: {{bosh-director-ip}}
-      BOSH_USER: {{bosh-user}}
-      BOSH_PASSWORD: {{bosh-password}}
-      START_STOP: start
-      TARGET: pcf-1.10
-    file: pcf-start-stop/ci/tasks/pcf-start-stop.yml
-- name: stop-ert
-  plan:
-  - get: every4am
-    trigger: true
-  - get: pcf-start-stop
-  - task: stop-ert
-    params:
-      <<: *OPSMGR
-      START_STOP: stop
-      TARGET: pcf-1.10
-    file: pcf-start-stop/ci/tasks/pcf-start-stop.yml
-- name: smoke-test-ert
-  plan:
-  - get: pcf-start-stop
-  - task: start-ert
-    params:
-      <<: *OPSMGR
-    file: pcf-start-stop/ci/tasks/smoke-test-ert.yml
-- name: stop-jmx-bridge
-  plan:
-  - get: every4am
-    passed:
-    - stop-ert
-    trigger: true
-  - get: pcf-start-stop
-  - task: stop-jmx-bridge
-    params:
-      <<: *OPSMGR
-      START_STOP: stop
-      TARGET: jmx-bridge
-    file: pcf-start-stop/ci/tasks/pcf-start-stop.yml
-- name: stop-stackdriver-nozzle
-  plan:
-  - get: every4am
-    passed:
-    - stop-jmx-bridge
-    trigger: true
-  - get: pcf-start-stop
-  - task: stop-stackdriver-nozzle
-    params:
-      <<: *OPSMGR
-      START_STOP: stop
-      TARGET: stackdriver-nozzle
-    file: pcf-start-stop/ci/tasks/pcf-start-stop.yml
 
+jobs:
+- name: bosh-stop-cf
+  plan:
+  - get: pcf-start-stop
+  - task: bosh
+    params:
+      <<: *OPSMGR
+      <<: *BOSH
+      DEPLOYMENT: cf
+      SUBCMD: 'stop --hard'
+    config:
+      <<: *BOSH_CLI
+- name: bosh-start-cf
+  plan:
+  - get: pcf-start-stop
+  - task: bosh
+    params:
+      <<: *OPSMGR
+      <<: *BOSH
+      DEPLOYMENT: cf
+      SUBCMD: start
+    config:
+      <<: *BOSH_CLI
+- name: bosh-stop-metrics-forwarder
+  plan:
+  - get: pcf-start-stop
+  - task: bosh
+    params:
+      <<: *OPSMGR
+      <<: *BOSH
+      DEPLOYMENT: p-metrics-forwarder
+      SUBCMD: 'stop --hard'
+    config:
+      <<: *BOSH_CLI
+- name: bosh-start-metrics-forwarder
+  plan:
+  - get: pcf-start-stop
+  - task: bosh
+    params:
+      <<: *OPSMGR
+      <<: *BOSH
+      DEPLOYMENT: p-metrics-forwarder
+      SUBCMD: start
+    config:
+      <<: *BOSH_CLI
+
+params:
+  opsmgr: &OPSMGR
+    OPSMGR_HOST: {{opsmgr-host}}
+    OPSMGR_SSH_USER: {{opsmgr-ssh-user}}
+    OPSMGR_SSH_KEY: {{opsmgr-ssh-key}}
+  bosh: &BOSH
+    BOSH_CLIENT: {{bosh-client}}
+    BOSH_ENVIRONMENT: {{bosh-environment}}
+    BOSH_CLIENT_SECRET: {{bosh-client-secret}}
+    BOSH_CA_CERT: {{bosh-ca-cert}}
+  tasks:
+    bosh-cli: &BOSH_CLI 
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: starkandwayne/concourse
+      inputs:
+      - name: pcf-start-stop
+      run:
+        path: bash
+        args: 
+        - -c
+        - |
+          set -e
+
+          CA_FILE=director_ca_`date +%s`
+          cat > ${CA_FILE} <<EOF
+          ${BOSH_CA_CERT}
+          EOF
+          cat > ~/opsmgr_ssh <<EOF
+          ${OPSMGR_SSH_KEY}
+          EOF
+          chmod 400 ~/opsmgr_ssh
+          SSH_OPTS="-oStrictHostKeyChecking=no -i ~/opsmgr_ssh"
+          SSH_TARGET=${OPSMGR_SSH_USER}@${OPSMGR_HOST}
+
+          scp ${SSH_OPTS} ${CA_FILE} ${SSH_TARGET}:/tmp/ > /dev/null
+          ssh ${SSH_OPTS} ${SSH_TARGET} "
+          export BOSH_CLIENT=${BOSH_CLIENT}
+          export BOSH_ENVIRONMENT=${BOSH_ENVIRONMENT}
+          export BOSH_CLIENT_SECRET=${BOSH_CLIENT_SECRET}
+          export BOSH_CA_CERT=/tmp/${CA_FILE}
+
+          D=\`ls -t /var/tempest/workspaces/default/deployments/${DEPLOYMENT}* | head -1 | xargs basename | sed 's/.yml//'\`
+          echo "Deployment: \${D}"
+          bosh2 -n -d \${D} ${SUBCMD}
+
+          rm -f /tmp/${CA_FILE}
+          "
 

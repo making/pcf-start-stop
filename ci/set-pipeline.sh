@@ -1,3 +1,5 @@
 #!/bin/sh
 
-echo y | fly -t home set-pipeline -p pcf-start-stop -c pipeline.yml -l credentials.yml
+fly -t home set-pipeline -p pcf-start-stop \
+    -c `dirname $0`/pipeline.yml \
+    -l `dirname $0`/credentials.yml
