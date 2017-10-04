@@ -10,6 +10,8 @@ jobs:
 - name: opsmgr-stop
   plan:
   - get: pcf-start-stop
+    passed:
+    - bosh-stop-cf
   - task: opsmgr-stop
     params:
       GCP_SERVICE_ACCOUNT_KEY: {{gcp-service-account-key}}
@@ -32,6 +34,9 @@ jobs:
 - name: director-stop
   plan:
   - get: pcf-start-stop
+    passed:
+    - bosh-stop-prometheus
+    - bosh-stop-cf
   - task: director-stop
     params:
       GCP_SERVICE_ACCOUNT_KEY: {{gcp-service-account-key}}
@@ -59,12 +64,15 @@ jobs:
       <<: *OPSMGR
       <<: *BOSH
       DEPLOYMENT: cf
-      SUBCMD: 'stop --hard --force'
+      SUBCMD: 'stop --hard --force --skip-drain'
     config:
       <<: *BOSH_CLI
 - name: bosh-start-cf
   plan:
   - get: pcf-start-stop
+    passed:
+    - opsmgr-start
+    - director-start
   - task: bosh
     params:
       <<: *OPSMGR
@@ -98,6 +106,9 @@ jobs:
 - name: bosh-start-metrics-forwarder
   plan:
   - get: pcf-start-stop
+    passed:
+    - opsmgr-start
+    - director-start
   - task: bosh
     params:
       <<: *OPSMGR
@@ -120,6 +131,9 @@ jobs:
 - name: bosh-start-prometheus
   plan:
   - get: pcf-start-stop
+    passed:
+    - opsmgr-start
+    - director-start
   - task: bosh
     params:
       <<: *OPSMGR
@@ -180,23 +194,20 @@ params:
         - |
           set -e
 
-          CA_FILE=director_ca_`date +%s`
-          cat > ${CA_FILE} <<EOF
-          ${BOSH_CA_CERT}
-          EOF
-          cat > ~/opsmgr_ssh <<EOF
+          cat <<EOF > ~/opsmgr_ssh
           ${OPSMGR_SSH_KEY}
           EOF
           chmod 400 ~/opsmgr_ssh
           SSH_OPTS="-oStrictHostKeyChecking=no -i ~/opsmgr_ssh"
           SSH_TARGET=${OPSMGR_SSH_USER}@${OPSMGR_HOST}
 
-          scp ${SSH_OPTS} ${CA_FILE} ${SSH_TARGET}:/tmp/ > /dev/null
           ssh ${SSH_OPTS} ${SSH_TARGET} "
-          export BOSH_CLIENT=${BOSH_CLIENT}
+          set -e
+
           export BOSH_ENVIRONMENT=${BOSH_ENVIRONMENT}
+          export BOSH_CLIENT=${BOSH_CLIENT}
           export BOSH_CLIENT_SECRET=${BOSH_CLIENT_SECRET}
-          export BOSH_CA_CERT=/tmp/${CA_FILE}
+          export BOSH_CA_CERT='${BOSH_CA_CERT}'
 
           D=\`ls -t /var/tempest/workspaces/default/deployments/${DEPLOYMENT}* | head -1 | xargs basename | sed 's/.yml//'\`
           if [ "x\${D}" == "x" ];then
@@ -205,6 +216,5 @@ params:
           echo "Deployment: \${D}"
           bosh2 -n -d \${D} ${SUBCMD}
           bosh2 vms
-          rm -f /tmp/${CA_FILE}
           "
 
