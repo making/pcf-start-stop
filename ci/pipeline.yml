@@ -7,6 +7,50 @@ resources:
     branch: master
 
 jobs:
+- name: opsmgr-stop
+  plan:
+  - get: pcf-start-stop
+  - task: opsmgr-stop
+    params:
+      GCP_SERVICE_ACCOUNT_KEY: {{gcp-service-account-key}}
+      GCP_PROJECT_ID: {{gcp-project-id}}
+      SUBCMD: stop
+      FILTER: tags:pcf-opsmanager
+    config:
+      <<: *GCLOUD
+- name: opsmgr-start
+  plan:
+  - get: pcf-start-stop
+  - task: opsmgr-start
+    params:
+      GCP_SERVICE_ACCOUNT_KEY: {{gcp-service-account-key}}
+      GCP_PROJECT_ID: {{gcp-project-id}}
+      SUBCMD: start
+      FILTER: tags:pcf-opsmanager
+    config:
+      <<: *GCLOUD
+- name: director-stop
+  plan:
+  - get: pcf-start-stop
+  - task: director-stop
+    params:
+      GCP_SERVICE_ACCOUNT_KEY: {{gcp-service-account-key}}
+      GCP_PROJECT_ID: {{gcp-project-id}}
+      SUBCMD: stop
+      FILTER: labels.deployment:p-bosh
+    config:
+      <<: *GCLOUD
+- name: director-start
+  plan:
+  - get: pcf-start-stop
+  - task: director-start
+    params:
+      GCP_SERVICE_ACCOUNT_KEY: {{gcp-service-account-key}}
+      GCP_PROJECT_ID: {{gcp-project-id}}
+      SUBCMD: start
+      FILTER: labels.deployment:p-bosh
+    config:
+      <<: *GCLOUD
 - name: bosh-stop-cf
   plan:
   - get: pcf-start-stop
@@ -15,7 +59,7 @@ jobs:
       <<: *OPSMGR
       <<: *BOSH
       DEPLOYMENT: cf
-      SUBCMD: 'stop --hard'
+      SUBCMD: 'stop --hard --force'
     config:
       <<: *BOSH_CLI
 - name: bosh-start-cf
@@ -29,6 +73,17 @@ jobs:
       SUBCMD: start
     config:
       <<: *BOSH_CLI
+- name: bosh-run-errand-smoke-tests
+  plan:
+  - get: pcf-start-stop
+  - task: bosh
+    params:
+      <<: *OPSMGR
+      <<: *BOSH
+      DEPLOYMENT: cf
+      SUBCMD: 'run-errand smoke-tests'
+    config:
+      <<: *BOSH_CLI
 - name: bosh-stop-metrics-forwarder
   plan:
   - get: pcf-start-stop
@@ -37,7 +92,7 @@ jobs:
       <<: *OPSMGR
       <<: *BOSH
       DEPLOYMENT: p-metrics-forwarder
-      SUBCMD: 'stop --hard'
+      SUBCMD: 'stop --hard --force'
     config:
       <<: *BOSH_CLI
 - name: bosh-start-metrics-forwarder
@@ -48,6 +103,28 @@ jobs:
       <<: *OPSMGR
       <<: *BOSH
       DEPLOYMENT: p-metrics-forwarder
+      SUBCMD: start
+    config:
+      <<: *BOSH_CLI
+- name: bosh-stop-prometheus
+  plan:
+  - get: pcf-start-stop
+  - task: bosh
+    params:
+      <<: *OPSMGR
+      <<: *BOSH
+      DEPLOYMENT: prometheus
+      SUBCMD: 'stop --hard --force'
+    config:
+      <<: *BOSH_CLI
+- name: bosh-start-prometheus
+  plan:
+  - get: pcf-start-stop
+  - task: bosh
+    params:
+      <<: *OPSMGR
+      <<: *BOSH
+      DEPLOYMENT: prometheus
       SUBCMD: start
     config:
       <<: *BOSH_CLI
@@ -63,6 +140,31 @@ params:
     BOSH_CLIENT_SECRET: {{bosh-client-secret}}
     BOSH_CA_CERT: {{bosh-ca-cert}}
   tasks:
+    gcloud: &GCLOUD
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: google/cloud-sdk
+          tag: slim
+      inputs:
+      - name: pcf-start-stop
+      run:
+        path: bash
+        args: 
+        - -c
+        - |
+          set -e
+
+          cat <<EOF > key.json
+          ${GCP_SERVICE_ACCOUNT_KEY}
+          EOF
+          gcloud auth activate-service-account --key-file key.json --project ${GCP_PROJECT_ID}
+          NAME=`gcloud compute instances list --filter="${FILTER}" | tail -1 | awk '{print $1}'`
+          ZONE=`gcloud compute instances list --filter="${FILTER}" | tail -1 | awk '{print $2}'`
+          echo "${SUBCMD} > ${NAME} ${ZONE}"
+          gcloud compute instances ${SUBCMD} ${NAME} --zone ${ZONE}
+          gcloud compute instances list
     bosh-cli: &BOSH_CLI 
       platform: linux
       image_resource:
@@ -97,9 +199,12 @@ params:
           export BOSH_CA_CERT=/tmp/${CA_FILE}
 
           D=\`ls -t /var/tempest/workspaces/default/deployments/${DEPLOYMENT}* | head -1 | xargs basename | sed 's/.yml//'\`
+          if [ "x\${D}" == "x" ];then
+            D=${DEPLOYMENT}
+          fi
           echo "Deployment: \${D}"
           bosh2 -n -d \${D} ${SUBCMD}
-
+          bosh2 vms
           rm -f /tmp/${CA_FILE}
           "
 
